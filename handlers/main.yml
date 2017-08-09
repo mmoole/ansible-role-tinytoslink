@@ -1,0 +1,25 @@
+#- block: restart-system
+- name: reboot_message
+  debug:
+    msg: "You need to restart the host {{ inventory_hostname }} manually!"
+
+- name: reboot
+  shell: sleep 3 && shutdown -r now "Ansible updates triggered"
+  async: 1
+  poll: 0
+  become: true
+  become_user: root
+  #ignore_errors: true
+  changed_when: true
+  notify: reboot_waitforhost
+
+# wait for host to be present
+- name: reboot_waitforhost
+  wait_for:
+    host: '{{ ansible_host }}'
+    port: 22
+    state: started
+    timeout: 300
+    delay: 8
+  delegate_to: localhost
+  become: false

@@ -1,0 +1,61 @@
+# tasks für tinytoslink
+# via https://www.mikrocontroller.net/topic/331467
+
+# zum testen:
+# http://www.freespecialeffects.co.uk/soundfx/sirens/police_s.wav
+# sudo apt-get install mplayer -y
+# mplayer police_s.wav
+
+##############  Achtung: Fehler beim Booten dürfen vorkommen, z.b.:
+# ASoC: CODEC DAI wm8804-spdif not registered
+# snd_soc_register_card() failed: -517
+# und sind nicht schlimm, solange der TEst mit mplayer zum Erfolg führt
+
+# via https://support.hifiberry.com/hc/en-us/articles/205377651
+# und https://github.com/igsol/mpd_rpi
+- block:
+  - name: remove onboard sound kernel module
+    modprobe: name='{{ item }}' state='absent'
+    with_items:
+      - snd-bcm2835
+    register: activate_tinytoslink
+    notify: reboot
+
+  - name: remove onboard sound from config.txt
+    lineinfile:
+      dest: /boot/config.txt
+      state: absent
+      regexp: '^dtparam=audio=on'
+    notify: reboot
+
+# overlay file - dies könnte durchaus unnötig sein, da es meist schon lokal vorhanden ist.
+  - name: download overlay file
+    get_url:
+      url: https://github.com/notro/rpi-firmware/raw/master/overlays/hifiberry-digi-overlay.dtb
+      dest: /boot/hifiberry-digi-overlay.dtb
+
+  - name: Configure device tree overlay file
+    lineinfile:
+      dest: /boot/config.txt
+      state: present
+      #regexp: '^dtoverlay=hifiberry-digi'
+      # activate Hifiberry DAC+ Device Tree overlay"
+      line: "dtoverlay=hifiberry-digi"
+    notify: reboot
+
+  - name: ALSA Configuration
+    template:
+      src: asound.conf.j2
+      dest: /etc/asound.conf
+      owner: root
+      group: root
+      mode:  0644
+    notify: reboot
+
+  - name: no specifi user ALSA configuration allowed
+    file:
+      path: ~/.asound.conf
+      state: absent
+
+  become: true
+  become_user: root
